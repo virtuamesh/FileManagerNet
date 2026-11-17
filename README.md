@@ -6,6 +6,8 @@ A Razor Class Library that mounts as a tag helper and ships its own HTTP API, wi
 desktop-explorer-style UI (ribbon toolbar, folder tree, breadcrumb, multi-view layouts).
 Built from scratch with **vanilla JS — no jQuery, no third-party npm packages**.
 
+Official website: <https://www.virtuamesh.com/>
+
 ![features](https://img.shields.io/badge/license-MIT-blue) ![net](https://img.shields.io/badge/.NET-10.0-purple)
 
 > 📘 **完整配置手册（中文）**：[`docs/configuration.zh-CN.md`](docs/configuration.zh-CN.md) —

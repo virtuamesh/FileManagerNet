@@ -11,6 +11,7 @@
     <Description>A free, open-source (MIT) Windows-Explorer-style file manager control for ASP.NET Core 10. Vanilla JS front-end, no jQuery.</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageTags>filemanager;file-explorer;aspnetcore;taghelper;file-upload;file-download</PackageTags>
+    <PackageProjectUrl>https://www.virtuamesh.com/</PackageProjectUrl>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
