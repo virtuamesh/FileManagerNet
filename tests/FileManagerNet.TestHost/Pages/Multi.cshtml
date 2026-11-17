@@ -1,0 +1,32 @@
+@page
+@using FileManagerNet.Models
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@addTagHelper *, FileManagerNet
+@{
+    Layout = null;
+    var root1 = Environment.GetEnvironmentVariable("FMNET_TEST_ROOT") ?? "";
+    var root2 = Environment.GetEnvironmentVariable("FMNET_TEST_ROOT2") ?? root1;
+    var cfg = new FileManagerConfig { MaxUploadBytes = 0 };
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>two instances</title>
+    <style>
+        html, body { margin: 0; height: 100%; }
+        .split { display: flex; height: 100%; }
+        .split > div { flex: 1 1 0; min-width: 0; height: 100%; }
+    </style>
+</head>
+<body>
+<div class="split">
+    <div>
+        <file-manager id="FM_A" root-folder="@root1" root-name="A" api-endpoint="/filemanager-api" config="cfg" />
+    </div>
+    <div>
+        <file-manager id="FM_B" root-folder="@root2" root-name="B" api-endpoint="/filemanager-api" config="cfg" />
+    </div>
+</div>
+</body>
+</html>

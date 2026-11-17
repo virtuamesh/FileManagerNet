@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/demo/">
+    <Project Path="demo/FileManagerNet.Demo/FileManagerNet.Demo.csproj" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/FileManagerNet/FileManagerNet.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/FileManagerNet.E2ETests/FileManagerNet.E2ETests.csproj" />
+    <Project Path="tests/FileManagerNet.TestHost/FileManagerNet.TestHost.csproj" />
+  </Folder>
+</Solution>

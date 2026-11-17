@@ -1,0 +1,69 @@
+@page
+@using FileManagerNet.Models
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@addTagHelper *, FileManagerNet
+@inject IWebHostEnvironment Env
+@{
+    var fmConfig = new FileManagerConfig { DefaultView = ViewLayout.Details };
+    // 单目录：整个控件只有这一个根，根节点直接列出它的内容
+    var singleRoot = System.IO.Directory.Exists(@"D:\测试文档")
+        ? @"D:\测试文档"
+        : System.IO.Path.Combine(Env.ContentRootPath, "App_Data", "demo-files");
+
+    // 多目录：分号分隔，可用「名称=路径」给每个根起名；根节点下列出这些文件夹
+    var multiRoot =
+        $"测试文档={(System.IO.Directory.Exists(@"D:\测试文档") ? @"D:\测试文档" : System.IO.Path.Combine(Env.ContentRootPath, "App_Data", "demo-files"))};" +
+        $"示例数据={System.IO.Path.Combine(Env.ContentRootPath, "App_Data", "demo-files")}";
+}
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FileManagerNet — 单目录 / 多目录根</title>
+    <style>
+        html, body { margin: 0; height: 100%; font-family: "Segoe UI", system-ui, sans-serif; background: #f3f4f6; }
+        .page { display: flex; flex-direction: column; height: 100%; }
+        .page-header { padding: 10px 16px; background: #1e293b; color: #fff; }
+        .page-header h1 { margin: 0; font-size: 15px; font-weight: 600; }
+        .page-header p { margin: 3px 0 0; font-size: 12px; color: #94a3b8; }
+        .page-header code { color: #e2e8f0; }
+        .split { flex: 1; display: flex; gap: 10px; padding: 10px; box-sizing: border-box; min-height: 0; }
+        .split > section { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; }
+        .split h2 { margin: 0 0 6px; font-size: 12px; font-weight: 600; color: #475569; }
+        @@media (max-width: 900px) {
+            .split { flex-direction: column; }
+            .split > section { flex: 1 1 0; min-height: 0; }
+        }
+    </style>
+</head>
+<body>
+<div class="page">
+    <div class="page-header">
+        <h1>单目录 / 多目录根</h1>
+        <p>
+            左：<code>root-folder="D:\测试文档"</code> — 一个目录，直接作为根。<br />
+            右：<code>root-folder="名称=D:\测试文档;名称2=...\demo-files"</code> — 多个目录，根节点下以文件夹形式列出，各自仍是独立的物理根。
+        </p>
+    </div>
+    <div class="split">
+        <section>
+            <h2>单个根目录</h2>
+            <file-manager id="FM_SINGLE_ROOT"
+                          root-folder="@singleRoot"
+                          root-name="测试文档"
+                          api-endpoint="/filemanager-api"
+                          config="fmConfig" />
+        </section>
+        <section>
+            <h2>多个根目录（虚拟根只列出挂载的文件夹）</h2>
+            <file-manager id="FM_MULTI_ROOT"
+                          root-folder="@multiRoot"
+                          root-name="我的文件"
+                          api-endpoint="/filemanager-api"
+                          config="fmConfig" />
+        </section>
+    </div>
+</div>
+</body>
+</html>
