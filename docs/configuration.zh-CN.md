@@ -1,6 +1,6 @@
 # FileManagerNet 配置与使用说明
 
-适用于 FileManagerNet **1.18.1**（ASP.NET Core 10 / .NET 10，Razor Pages 或 MVC 均可）。
+适用于 FileManagerNet **1.0.0**（ASP.NET Core 10 / .NET 10，Razor Pages 或 MVC 均可）。
 
 这份文档覆盖：怎么接进来、每个配置项的确切含义与默认值、权限（ACL）怎么配、
 HTTP API 长什么样、常见场景的配方，以及配置错了会看到什么现象。

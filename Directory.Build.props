@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <!-- 本仓库所有项目共用的版本号，升级时只需修改这一处 -->
-    <Version>1.18.1</Version>
+    <Version>1.0.0</Version>
   </PropertyGroup>
 
 </Project>
