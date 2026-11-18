@@ -1,11 +1,11 @@
 # FileManagerNet 配置与使用说明
 
-适用于 FileManagerNet **1.0.0**（ASP.NET Core 10 / .NET 10，Razor Pages 或 MVC 均可）。
+适用于 FileManagerNet **1.0.1**（ASP.NET Core 10 / .NET 10，Razor Pages 或 MVC 均可）。
 
 这份文档覆盖：怎么接进来、每个配置项的确切含义与默认值、权限（ACL）怎么配、
 HTTP API 长什么样、常见场景的配方，以及配置错了会看到什么现象。
 
-> 英文版功能清单见根目录 `README.md`；本文是面向使用者的完整配置手册。
+> 英文版功能清单见根目录 [README.md](../README.md)；本文是面向使用者的完整配置手册。
 > 官方网站：<https://www.virtuamesh.com/>
 
 ---
@@ -52,7 +52,7 @@ var app = builder.Build();
 
 app.MapFileManagerNet("/filemanager-api", o =>
 {
-    // 兜底根目录：页面没写 root-folder 时用这个
+    // 这里配置的是 MapFileManagerNet 注册的“默认实例”（id = api-endpoint）
     o.RootFolder = Path.Combine(app.Environment.ContentRootPath, "App_Data", "files");
     o.RootDisplayName = "Files";
     o.Config = new FileManagerConfig { DefaultView = ViewLayout.Details };
@@ -70,6 +70,12 @@ app.Run();
 app.MapFileManagerNet("/filemanager-api", o => { ... })
    .RequireAuthorization("StaffOnly");
 ```
+
+> **实例边界**：上面 `o` 里的根目录和 `Config` 只属于 `MapFileManagerNet` 注册的那个默认实例
+> （id 等于 `api-endpoint`）。页面里的 `<file-manager id="FM1">` 是独立实例，根目录和开关只来自
+> 标签属性（`root-folder`、`config`），**不会继承** `o.RootFolder` / `o.Config`。
+> 同 `id` 的 `FileManagerRegistry.Register` 只用于预先挂 ACL：标签助手会保留这些规则，
+> 但根目录仍以标签属性为准。
 
 ### 1.3 在页面挂载
 
@@ -93,12 +99,12 @@ app.MapFileManagerNet("/filemanager-api", o => { ... })
 | 属性 | 必填 | 默认 | 说明 |
 |---|---|---|---|
 | `id` | 否 | 自动生成 `fm-<guid>` | 实例标识，**页面内唯一**。前端只把它发给服务端，物理路径永远不出现在 HTML 里 |
-| `root-folder` | 否 | `AppContext.BaseDirectory` | 单个物理目录，或 `;` 分隔的多个目录（见第 3 节） |
+| `root-folder` | 否 | `AppContext.BaseDirectory` | 单个物理目录，或 `;` 分隔的多个目录（见第 3 节）。相对路径按进程工作目录解析，生产环境建议写绝对路径 |
 | `root-folders` | 否 | — | `root-folder` 的别名；**同时出现时以它为准** |
 | `root-name` | 否 | 单根取文件夹名，多根为 `Home` | 左侧树与面包屑里显示的根节点名称 |
 | `api-endpoint` | 否 | `/filemanager-api` | 必须与 `MapFileManagerNet` 的路径一致 |
 | `locale` | 否 | 跟随浏览器 | 强制界面语言，见 [7.3](#73-本地化) |
-| `config` | 否 | `AddFileManagerNet` 里的默认值 | 绑一个 `FileManagerConfig` 对象（Razor 里用 `config="fmConfig"`） |
+| `config` | 否 | `new FileManagerConfig()` | 绑一个 `FileManagerConfig` 对象（Razor 里用 `config="fmConfig"`）；提供后**整体替换**默认配置 |
 
 `config` 在 Razor 页面里的写法：
 
@@ -158,7 +164,7 @@ Linux / macOS 示例：`root-folder="资料=/srv/data;备份=/mnt/backup"`。绝
 | 跨根复制/移动 | — | 允许；跨盘移动自动退化为"复制 + 删除" |
 | 搜索 | 当前目录递归 | 根目录下搜索会遍历所有挂载 |
 
-C# 侧等价写法（`AddFileManagerNet` 或 `MapFileManagerNet` 的 `o`）：
+C# 侧等价写法（`MapFileManagerNet` 的 `o`，作用于默认实例）：
 
 ```csharp
 o.RootFolders.Add(new FileManagerRoot(@"D:\Data", "资料"));
@@ -166,7 +172,9 @@ o.RootFolders.Add(new FileManagerRoot(@"E:\Backup", "备份"));
 // 或 o.AddRoot(@"D:\Data", "资料");
 ```
 
-`RootFolders` 非空时优先于 `RootFolder` 字符串。
+`RootFolders` 非空时优先于 `RootFolder` 字符串。页面里的标签实例不会读取这些选项；
+根目录以标签属性为准；要预挂 ACL，用 `FileManagerRegistry.Register("FM1", roots, ...)`
+注册同 `id` 的实例（见 5.4）。
 
 ### 3.3 同页多个实例
 
@@ -205,6 +213,10 @@ o.RootFolders.Add(new FileManagerRoot(@"E:\Backup", "备份"));
 | `Locale` | `""` | 强制语言，空 = 跟随浏览器 |
 
 关闭某个开关后：按钮从功能区与右键菜单消失，直接调 API 也会被拒绝并返回 **403**。
+
+`OfficePreviewAvailable` 是服务端在注册实例时计算出的只读结果（开关打开 **且** 找到
+LibreOffice），不要手工在配置里设置；`Config` 里的 `[JsonIgnore]` 字段（`LibreOfficePath`、
+缓存目录等）只留在服务端，不会下发到浏览器。
 
 ---
 
@@ -260,6 +272,7 @@ o.RootFolders.Add(new FileManagerRoot(@"E:\Backup", "备份"));
 3. **拒绝优先**：`Denied` 从 `Allowed` 中扣除。
 4. **类型过滤是"全动作"的**：被拒的文件类型不出现在列表里，也不能下载、预览、上传 —— 等效于"看不见"。
 5. **实例开关是上限**：最终权限 = 规则结果 ∩ 实例开关。实例关掉上传时，ACL 里写了 `Upload` 也不会生效。
+6. **同深度冲突**：多条规则匹配到同一深度时，**后添加的规则覆盖先添加的**，便于在末尾追加例外。
 
 ### 5.4 配置方式
 
@@ -300,7 +313,7 @@ FileManagerRegistry.Register("FM_DOCS", new[] { root }, "共享盘", new FileMan
 ```
 
 > 模板渲染时会用同一个 `id` 重新注册实例（以拿到页面上的真实路径），
-> 但会**保留**你在 `Program.cs` 里挂的规则 —— 不会静默丢失。
+> 但会**保留**你在 `Program.cs` 里挂的规则（前提是根目录数量一致）—— 不会静默丢失。
 
 **方式二：完整的对象写法**（等价，便于从配置/数据库生成）。
 
@@ -411,7 +424,8 @@ o.Config.UseSystemIcons = true;      // 仅 Windows；其他平台自动回退�
 
 内置 9 种语言：`en`、`zh-CN`、`zh-TW`、`ja`、`ko`、`de`、`fr`、`es`、`ru`。
 
-优先级：标签 `locale` 属性 > `FileManagerConfig.Locale` > 浏览器 `Accept-Language` > `en`。
+优先级：`FileManagerConfig.Locale` > 标签 `locale` 属性 > 浏览器 `navigator.languages` > `en`。
+两者同时设置时以 `FileManagerConfig.Locale` 为准。
 
 想加自己的翻译，在页面里挂一份同结构的对象即可（会覆盖内置语言包）：
 
@@ -429,6 +443,9 @@ window.FMNetLocales["zh-CN"] = { ... };   // 只需写要改的键，其余回�
 所有端点都在 `api-endpoint` 下，且必须带 `?instance=<id>`。
 实例 id 是页面渲染时注册的，客户端无法指定任意服务器路径。
 
+JSON 端点返回统一信封 `{ ok, error, data }`；`download`、`thumb`、`office`、`icon`
+直接返回字节流，不使用信封，目标不存在时是空的 **404**。
+
 ### 8.1 端点
 
 | 端点 | 方法 | 说明 |
@@ -438,9 +455,9 @@ window.FMNetLocales["zh-CN"] = { ... };   // 只需写要改的键，其余回�
 | `{api}/download?paths=a\|b` | GET | 多选打包成 zip 下载 |
 | `{api}/thumb?path=` | GET | 预览/缩略图内容（支持 Range）|
 | `{api}/office?path=` | GET | Office 文档转成的 PDF |
-| `{api}/icon?ext=docx&size=32` | GET | 系统图标 PNG（需 `UseSystemIcons`）|
+| `{api}/icon?ext=docx&size=32` | GET | 系统图标 PNG（需 `UseSystemIcons = true`）|
 | `{api}/upload` | POST | 传统 multipart 上传（小文件 / 第三方客户端）|
-| `{api}/upload/init` | POST | 开始分块会话，返回 `{id, received, chunkSize}`；`received > 0` 表示可续传 |
+| `{api}/upload/init` | POST | 开始分块会话，返回 `{id, received, chunkSize, path}`；`received > 0` 表示可续传 |
 | `{api}/upload/chunk?id=&offset=` | POST | 上传一块（原始二进制）。偏移不符返回 **409 + 真实 received**，客户端对齐后继续 |
 | `{api}/upload/complete?id=&overwrite=&rename=` | POST | 合并落盘，自动创建目录；重名返回 **409 + conflicts** |
 | `{api}/upload?id=` | DELETE | 中止会话并删除临时分片 |
@@ -482,14 +499,15 @@ window.FMNetLocales["zh-CN"] = { ... };   // 只需写要改的键，其余回�
 
 | 状态码 | 含义 |
 |---|---|
-| 200 | 成功（业务失败也是 200 + `ok:false`，仅命令接口如此）|
-| 400 | JSON 格式错误 / 参数非法 / 未注册的实例 |
+| 200 | 成功；命令接口里的文件系统失败也是 200 + `ok:false` |
+| 400 | JSON 格式错误、未注册的实例、上传 id / 参数非法 |
 | 403 | **权限不足或被开关禁用**（ACL、实例开关都会走到这里）|
-| 404 | 文件或任务不存在 |
+| 404 | 下载/预览目标不存在、任务不存在（文件类端点返回空 404，无信封）|
 | 409 | 重名冲突（`conflicts` 里是冲突的名字）；分块偏移不符（`received` 是实际已收字节数）|
 | 410 | 上传会话过期或不存在 |
-| 413 | 超过上传/预览大小上限 |
+| 413 | 超过上传或 Office 预览的大小上限 |
 | 415 | Office 预览收到了非 Office 文件 |
+| 500 | Office 转换失败（例如 LibreOffice 进程报错）|
 
 ---
 
@@ -630,6 +648,7 @@ ThreadPool.SetMinThreads(200, 200);   // 在 Program.cs 最前面，按实际压
 | 中文文件名乱码 | 上传端未用 UTF-8 编码文件名 | 统一 UTF-8；文本预览可手动切换编码 |
 | 多实例第二个不工作 | 手动挂载时漏了 `.fmnet-root` 容器 | 用标签助手，或确保内层有 `.fmnet-root` |
 | 改了 ACL 不生效 | 规则在实例注册时固化 | 用同 `id` 重新 `Register` |
+| 标签实例没继承 `Program.cs` 里的根目录或开关 | `MapFileManagerNet` 的 `o` 只配置默认实例 | 在标签上写 `root-folder` / `config`；ACL 用同 `id` 的 `Register` 预挂 |
 
 ---
 
@@ -648,7 +667,7 @@ builder.Services.AddRazorPages();
 
 var app = builder.Build();
 
-// ① 默认实例（页面不写 root-folder 时使用）
+// ① 默认实例（id = "/filemanager-api"；页面标签实例不会继承这里的配置）
 app.MapFileManagerNet("/filemanager-api", o =>
 {
     o.RootFolder = Path.Combine(app.Environment.ContentRootPath, "App_Data", "files");
@@ -744,6 +763,9 @@ app.Run();
               config="fmConfig"
               api-endpoint="/filemanager-api" />
 ```
+
+> Linux / macOS 部署时把示例里的 `D:\...` 换成 `/srv/...` 之类的原生绝对路径即可，
+> 其余配置不变。
 
 ---
 

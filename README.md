@@ -6,12 +6,31 @@ A Razor Class Library that mounts as a tag helper and ships its own HTTP API, wi
 desktop-explorer-style UI (ribbon toolbar, folder tree, breadcrumb, multi-view layouts).
 Built from scratch with **vanilla JS — no jQuery, no third-party npm packages**.
 
-Official website: <https://www.virtuamesh.com/>
+Official website: <https://www.virtuamesh.com/>  
+Repository: <https://github.com/virtuamesh/FileManagerNet>  
+NuGet: <https://www.nuget.org/packages/FileManagerNet>
 
 ![features](https://img.shields.io/badge/license-MIT-blue) ![net](https://img.shields.io/badge/.NET-10.0-purple)
 
-> 📘 **完整配置手册（中文）**：[`docs/configuration.zh-CN.md`](docs/configuration.zh-CN.md) —
-> 每个配置项的确切含义与默认值、权限（ACL）规则、HTTP API、常见场景配方、故障排查。
+> **Full configuration manual (Chinese):** [`docs/configuration.zh-CN.md`](docs/configuration.zh-CN.md) —
+> every option with its default value, ACL rules, the HTTP API, common recipes and troubleshooting.
+
+## Contents
+
+- [Screenshots](#screenshots)
+- [Features](#features)
+- [Access control](#access-control)
+- [Quick start](#quick-start)
+- [Solution layout](#solution-layout)
+- [Browser tests (Playwright)](#browser-tests-playwright)
+- [API reference](#api-reference)
+- [Concurrency and performance](#concurrency-and-performance)
+- [Security notes](#security-notes)
+- [Roadmap ideas](#roadmap-ideas)
+- [Credits](#credits)
+- [Contributing](#contributing)
+- [License](#license)
+
 
 ## Screenshots
 
@@ -38,7 +57,7 @@ Official website: <https://www.virtuamesh.com/>
   instance; the stylesheet and scripts are emitted **once per request**, and keyboard shortcuts
   only act on the pane you clicked last. See `demo/FileManagerNet.Demo/Pages/Multi.cshtml`.
 - **One or several root folders per instance** — `root-folder` takes a single folder or a
-  `;`-separated list, optionally named (`root-folder="数据=D:\Data;备份=E:\Backup"`). With several
+  `;`-separated list, optionally named (`root-folder="Data=D:\Data;Backup=E:\Backup"`). With several
   folders the root node lists them as folders; each keeps its own physical root server-side, and
   copy/move works across them (even across volumes). See `Pages/Roots.cshtml`.
 - **Folder-level permissions (ACL)** — mount read-only folders next to writable ones in the same
@@ -97,7 +116,7 @@ Official website: <https://www.virtuamesh.com/>
   previews above **4 MB** fetch only the first 4 MB and mark the truncation.
   Text previews **auto-detect the encoding** (BOM for UTF-8 / UTF-16 LE/BE, BOM-less UTF-16 via
   NUL parity, strict UTF-8, then script-likelihood scoring across GB18030, Big5, Shift-JIS,
-  EUC-KR, Windows-1251 and Windows-1252) and offer **31 encodings** in a header dropdown
+  EUC-KR, Windows-1251 and Windows-1252) and offer **30 encodings plus Auto** in a header dropdown
   (Unicode, CJK, Japanese, Korean, Western/Central-European, Cyrillic, Greek, Turkish,
   Hebrew, Arabic, Baltic, Vietnamese, Thai, Mac); the manual choice is remembered per extension.
 - **Office online preview** (optional) — Word / Excel / PowerPoint / OpenDocument files are
@@ -162,7 +181,7 @@ Permissions are enforced **on the server for every operation** — hiding a butt
 the browser never grants anything, and a hand-written API call gets a **403**.
 
 ```csharp
-var root = new FileManagerRoot(@"D://Shared", "Shared");
+var root = new FileManagerRoot(@"D:\Shared", "Shared");
 
 root
     // the whole tree is read-only …
@@ -183,9 +202,10 @@ root
 FileManagerRegistry.Register("FM_DOCS", new[] { root }, "Shared", new FileManagerConfig());
 ```
 
-The page then renders `<file-manager id="FM_DOCS" root-folder="D://Shared" ... />`: the tag
+The page then renders `<file-manager id="FM_DOCS" root-folder="D:\Shared" ... />`: the tag
 helper re-registers the instance (to pick up the rendered path) but **keeps the rules the
-host attached**. A full example is `demo/FileManagerNet.Demo/Pages/Acl.cshtml`.
+host attached** when the number of roots is unchanged. A full example is
+`demo/FileManagerNet.Demo/Pages/Acl.cshtml`.
 
 | Rule | Behaviour |
 |---|---|
@@ -208,14 +228,26 @@ file operation can afford to check it. See *Concurrency and performance* below.
 
 ## Quick start
 
+Requirements: the **.NET 10 SDK** and an ASP.NET Core 10 app (Razor Pages or MVC).
+Office preview additionally needs LibreOffice on the server (see §5).
+
+From NuGet:
+
+```bash
+dotnet add package FileManagerNet --version 1.0.1
+```
+
+Or run the bundled demo from a clone:
+
 ```bash
 dotnet run --project demo/FileManagerNet.Demo
 # open http://localhost:5099  (use Development env for static assets in dev)
 ```
 
 The demo uses its own `App_Data/demo-files` folder, so it runs unchanged on Windows, Linux and
-macOS. `root-folder` takes a native absolute path: `D:\Data` on Windows, `/srv/data` on Linux,
-`/Users/you/Documents` on macOS.
+macOS. `root-folder` takes a native path — `D:\Data` on Windows, `/srv/data` on Linux,
+`/Users/you/Documents` on macOS. Relative paths are resolved against the process working
+directory; prefer absolute paths in production.
 
 ### 1. Install the services
 
@@ -236,6 +268,12 @@ app.MapFileManagerNet("/filemanager-api", o =>
     o.RootDisplayName = "Demo Files";
 });
 ```
+
+> **Instance scope:** `MapFileManagerNet` registers a default instance keyed by the mapped route.
+> Tag-helper instances are independent: their root folders and feature switches come from the tag
+> attributes (`root-folder`, `config`). Calling `FileManagerRegistry.Register` with the same `id`
+> beforehand only pre-attaches ACL rules, which the tag helper preserves; it does not supply the
+> root path or the config.
 
 ### 3. Drop the control into any Razor page / view
 
@@ -263,8 +301,8 @@ name and `=` (`root-folders` is an alias for readability):
 
 <!-- several folders: the root node lists them as folders -->
 <file-manager id="FM2"
-              root-folder="数据=D:\Data;备份=E:\Backup;demos=C:\inetpub\demos"
-              root-name="我的文件"
+              root-folder="Data=D:\Data;Backup=E:\Backup;demos=C:\inetpub\demos"
+              root-name="My files"
               api-endpoint="/filemanager-api" />
 <file-manager id="FM2"
               root-folder="data=/srv/data;backup=/mnt/backup"
@@ -289,9 +327,9 @@ The same thing from code:
 ```csharp
 app.MapFileManagerNet("/filemanager-api", o =>
 {
-    o.RootFolders.Add(new FileManagerRoot(@"D:\Data", "数据"));
-    o.AddRoot(@"E:\Backup", "备份");            // fluent alternative
-    o.RootDisplayName = "我的文件";
+    o.RootFolders.Add(new FileManagerRoot(@"D:\Data", "Data"));
+    o.AddRoot(@"E:\Backup", "Backup");            // fluent alternative
+    o.RootDisplayName = "My files";
 });
 ```
 
@@ -428,28 +466,31 @@ dotnet test tests/FileManagerNet.E2ETests
 * `FileManagerNet.E2ETests` drives the **installed Chrome** (`Channel = "chrome"`, headless) —
   no `playwright install` step. One browser is shared; every test gets a fresh context, and the
   suite runs sequentially because the file tree is shared.
-* Coverage (54 tests): ribbon tabs/groups/collapse, context menu, tree/breadcrumb/up/home/refresh,
+* Coverage (87 tests): ribbon tabs/groups/collapse, context menu, tree/breadcrumb/up/home/refresh,
   all 7 layouts, column sorting, new folder/file, rename (F2), delete + confirm/cancel, multi-delete,
   copy, **cut/move**, paste conflicts (overwrite / keep both / cancel), drag-to-move, band selection,
   Ctrl/Shift click, select all/none/invert, single-file and ZIP downloads, chunked upload (incl. a
   6 MB multi-chunk file and a 6 MB-per-file payload), folder upload with hierarchy, drag-drop upload,
   recursive search, compress/extract, text preview + encoding label, image viewer (zoom/rotate/flip/
-  Esc), PDF preview, "no preview" toast, 1 200-entry virtual scrolling (window size + scroll
-  stability), two instances on one page, several root folders (virtual root is read-only), and four
-  UI languages.
+  Esc), PDF preview, Markdown preview + Preview/Source switch + HTML escaping, "no preview" toast,
+  1 200-entry virtual scrolling (window size + scroll stability), two instances on one page, several
+  root folders (virtual root is read-only), Linux/macOS path rules (`:`, `..` in names, case-sensitive
+  ACL matching), and four UI languages.
 * Downloads are asserted at the HTTP level (the URL built by the button + status/headers/body/ZIP
   entries): this headless Chrome cancels download streams, even for a `data:` URL.
 
 ## API reference
 
-All endpoints live under the mapped route and require `?instance=<id>`.
+All endpoints live under the mapped route and require `?instance=<id>`. JSON endpoints
+return the envelope `{ ok, error, data }`; `download`, `thumb`, `office` and `icon` stream
+bytes instead (and return plain `404` when the target is missing).
 
 | Endpoint | Method | Description |
 |---|---|---|
 | `{api}` | POST | JSON command API |
-| `{api}/download?path=` | GET | Download one file (`&inline=1` to preview) |
+| `{api}/download?path=` | GET | Download one file (`&inline=1` to preview; range requests supported) |
 | `{api}/download?paths=a\|b` | GET | Download many items as a zip |
-| `{api}/thumb?path=` | GET | Inline content for previews/thumbnails |
+| `{api}/thumb?path=` | GET | Inline content for previews/thumbnails (range requests supported) |
 | `{api}/upload` | POST | multipart upload (`path`, `overwrite`, `files`) — kept for small files / other clients |
 | `{api}/upload/init` | POST | Starts a chunked session: `{path, name, relativePath, size, lastModified}` → `{id, received, chunkSize, path}` (`received > 0` = resume point) |
 | `{api}/upload/chunk?id=&offset=` | POST | Raw body with one chunk; `409 {received}` when the offset is behind/ahead — the client resyncs and continues |
@@ -457,7 +498,7 @@ All endpoints live under the mapped route and require `?instance=<id>`.
 | `{api}/upload?id=` | DELETE | Aborts a session and removes the partial file |
 | `{api}/job?id=` | GET | Progress of an archive job (`state`, `total`, `done`, `current`, `error`) |
 | `{api}/office?path=` | GET | Office document converted to PDF (LibreOffice) |
-| `{api}/icon?ext=docx&size=32` | GET | Icon of the default program for that extension (PNG, Windows) |
+| `{api}/icon?ext=docx&size=32` | GET | Icon of the default program for that extension (PNG, Windows; requires `UseSystemIcons = true`) |
 
 Commands (POST JSON body):
 
@@ -469,17 +510,20 @@ Commands (POST JSON body):
 | `createFolder` / `createFile` | `path` | |
 | `rename` | `path`, `newName` | |
 | `delete` | `paths[]` | multi-delete |
-| `copy` / `move` | `paths[]`, `destination`, `overwrite`, `renameOnConflict` | returns **409** with `conflicts: ["a.txt"]` when names clash and neither flag is set |
-| `search` | `path`, `search{pattern,recursive,maxResults}` | |
+| `copy` / `move` (`cut` is an alias of `move`) | `paths[]`, `destination`, `overwrite`, `renameOnConflict` | returns **409** with `conflicts: ["a.txt"]` when names clash and neither flag is set |
+| `search` | `path`, `search{pattern,maxResults}` | always recursive; `maxResults` defaults to 500 and is clamped to 5000 |
 | `zip` | `path` (zip target), `paths[]` | |
 | `extract` | `path` (zip), `destination`, `overwrite` | zip-slip protected |
+
+Archive commands (`zip`, `extract`) accept `"async": true`; the response then contains a
+`jobId` that you poll through `GET {api}/job?id=…`.
 
 `list` also returns `permissions` (the folder's effective flags) and `quotaBytes`,
 which is what drives the ribbon state. An operation the folder forbids returns
 **403** with a message naming the reason; a missing permission is never reported as
-a generic failure.
-
-Every response uses the envelope `{ ok, error, data }`.
+a generic failure. Malformed JSON and unknown instance ids return **400**; file-system
+failures inside a command are returned as `200` with `ok: false` (the command endpoint's
+error contract is the envelope, not HTTP status codes).
 
 ## Concurrency and performance
 
@@ -550,6 +594,13 @@ front the API with a queue.
 - [Material Icon Theme](https://github.com/PKief/vscode-material-icon-theme) — file-type icons (MIT),
   see `src/FileManagerNet/wwwroot/icons/LICENSE-material-icon-theme.txt`
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for build, test and pull-request guidelines. Security
+issues should be reported privately as described in [SECURITY.md](SECURITY.md). Release history
+is in [CHANGELOG.md](CHANGELOG.md).
+
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT — see [LICENSE](LICENSE). Third-party components and their licenses are listed in
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
