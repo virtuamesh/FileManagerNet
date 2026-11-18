@@ -13,6 +13,20 @@ Official website: <https://www.virtuamesh.com/>
 > 📘 **完整配置手册（中文）**：[`docs/configuration.zh-CN.md`](docs/configuration.zh-CN.md) —
 > 每个配置项的确切含义与默认值、权限（ACL）规则、HTTP API、常见场景配方、故障排查。
 
+## Screenshots
+
+**Main window — ribbon, folder tree, breadcrumb and Details view**
+
+![FileManagerNet main window](docs/screenshots/01-home.png)
+
+**Single root folder and virtual multi-root in one page**
+
+![Single and multiple root folders](docs/screenshots/02-roots.png)
+
+**Two independent instances on the same page — Details and Large icons**
+
+![Two independent instances](docs/screenshots/03-multi.png)
+
 ## Features
 
 - **Windows Explorer-like UI** — ribbon with **Home / View tabs** (grouped buttons with captions,
