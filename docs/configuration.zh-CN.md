@@ -129,6 +129,12 @@ app.MapFileManagerNet("/filemanager-api", o => { ... })
 
 目录本身就是根，虚拟路径 `/` 直接对应它的内容。
 
+Linux / macOS 使用系统原生绝对路径即可：
+
+```cshtml
+<file-manager id="FM1" root-folder="/srv/data" root-name="数据" api-endpoint="/filemanager-api" />
+```
+
 ### 3.2 一个实例挂多个目录
 
 ```cshtml
@@ -139,6 +145,8 @@ app.MapFileManagerNet("/filemanager-api", o => { ... })
 ```
 
 语法：`;`（或换行）分隔，`名称=路径` 可选，不写名称则取文件夹名。
+Linux / macOS 示例：`root-folder="资料=/srv/data;备份=/mnt/backup"`。绝对路径本身含 `=`
+也没问题（例如 `/srv/a=b`），只有非绝对路径才会按 `名称=路径` 解析。
 
 行为差异：
 

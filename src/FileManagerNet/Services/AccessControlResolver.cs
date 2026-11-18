@@ -26,9 +26,16 @@ namespace FileManagerNet.Services;
 /// </summary>
 public sealed class AccessControlResolver
 {
+    /// <summary>Windows paths match case-insensitively and treat '\' as a
+    /// separator; Linux/macOS paths are case-sensitive and keep '\' literal.</summary>
+    private static readonly bool IsWindows = OperatingSystem.IsWindows();
+
+    private static readonly StringComparer PathComparer =
+        IsWindows ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
+
     private readonly IReadOnlyList<(string[] Segments, FileManagerAccessControl Entry)> _entries;
     private readonly FileManagerConfig _config;
-    private readonly ConcurrentDictionary<string, EffectiveAccess> _cache = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, EffectiveAccess> _cache = new(PathComparer);
 
     /// <summary>Creates a resolver for one root folder.</summary>
     /// <param name="controls">Access-control entries of the root; empty allows everything.</param>
@@ -151,7 +158,7 @@ public sealed class AccessControlResolver
         }
 
         if (ti >= target.Length) return -1;
-        if (!FileSystemName.MatchesSimpleExpression(acl[ai], target[ti], ignoreCase: true)) return -1;
+        if (!FileSystemName.MatchesSimpleExpression(acl[ai], target[ti], ignoreCase: IsWindows)) return -1;
 
         /* `*` matches inside one segment only */
         return MatchSegments(acl, ai + 1, target, ti + 1);
@@ -175,7 +182,7 @@ public sealed class AccessControlResolver
     internal static string Normalize(string? virtualPath)
     {
         if (string.IsNullOrWhiteSpace(virtualPath)) return "/";
-        var p = virtualPath.Replace('\\', '/').Trim();
+        var p = (IsWindows ? virtualPath.Replace('\\', '/') : virtualPath).Trim();
         if (!p.StartsWith('/')) p = "/" + p;
         while (p.Length > 1 && p.EndsWith('/')) p = p[..^1];
         return p.Length == 0 ? "/" : p;

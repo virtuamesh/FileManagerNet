@@ -86,6 +86,9 @@ Official website: <https://www.virtuamesh.com/>
   rotate in 90° steps, flip horizontally or vertically**, fit / 1:1 / reset, arrows and
   `+ - 0 1 r f` shortcuts, natural pixel size in the toolbar, and a transparent check pattern
   behind the image.
+  **Markdown files render as a formatted document** (headings, lists, tables, task lists, code
+  fences, quotes, relative images and links) with a **Preview / Source** switch in the dialog
+  header; raw HTML inside a `.md` file is shown as text, never executed.
   Media is streamed through `GET {api}/download?inline=1` with **HTTP range support** (206),
   so the `<video>` / `<audio>` seek bar can be dragged instead of only playing from the start.
   When the browser cannot play a container/codec (mkv/avi on Chrome, …) the dialog says so and
@@ -147,8 +150,10 @@ Official website: <https://www.virtuamesh.com/>
   Français, Español, Русский — one file per language, loaded on demand. Defaults to the
   browser language; can be forced per instance; custom languages/overrides can be
   registered client-side.
-- **Path-safety**: all paths are virtual (root-relative); traversal (`..`, drive letters) is
-  rejected; each control instance's root is registered server-side only.
+- **Path-safety**: all paths are virtual (root-relative); traversal (`..` segments), NUL and
+  Windows drive/stream syntax are rejected; each control instance's root is registered
+  server-side only. File names keep the characters the host OS allows — `:` and `..` inside a
+  name work on Linux/macOS, and matching is case-sensitive there.
 - Cross-platform (Windows / Linux / macOS), zero external JS dependencies.
 
 ## Access control
@@ -208,6 +213,10 @@ dotnet run --project demo/FileManagerNet.Demo
 # open http://localhost:5099  (use Development env for static assets in dev)
 ```
 
+The demo uses its own `App_Data/demo-files` folder, so it runs unchanged on Windows, Linux and
+macOS. `root-folder` takes a native absolute path: `D:\Data` on Windows, `/srv/data` on Linux,
+`/Users/you/Documents` on macOS.
+
 ### 1. Install the services
 
 ```csharp
@@ -250,11 +259,16 @@ name and `=` (`root-folders` is an alias for readability):
 ```html
 <!-- a single folder: it is the root and its content is listed directly -->
 <file-manager id="FM1" root-folder="D:\Data" root-name="Data" api-endpoint="/filemanager-api" />
+<file-manager id="FM1" root-folder="/srv/data" root-name="Data" api-endpoint="/filemanager-api" />
 
 <!-- several folders: the root node lists them as folders -->
 <file-manager id="FM2"
               root-folder="数据=D:\Data;备份=E:\Backup;demos=C:\inetpub\demos"
               root-name="我的文件"
+              api-endpoint="/filemanager-api" />
+<file-manager id="FM2"
+              root-folder="data=/srv/data;backup=/mnt/backup"
+              root-name="Files"
               api-endpoint="/filemanager-api" />
 ```
 
@@ -515,7 +529,8 @@ front the API with a queue.
 ## Security notes
 
 - Clients only pass **virtual** paths; the physical root never crosses the wire.
-- `..`, drive letters, NUL and absolute paths are rejected (`UnauthorizedAccessException`).
+- `..` segments, NUL, and Windows drive-letter / alternate-stream syntax (`D:`, `file:stream`)
+  are rejected; on Linux/macOS `:` and `..` inside a single name are valid and preserved.
 - Tree/list endpoints resolve roots through `FileManagerRegistry` by instance id — an unknown or
   forged instance id is rejected.
 - ZIP extraction blocks `zip-slip` entries; upload size is capped by `MaxUploadBytes`.

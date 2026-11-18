@@ -505,9 +505,14 @@ public static class FileManagerEndpointRouteBuilderExtensions
     /// letters, no empty segments.</summary>
     private static string NormalizeUploadName(string? relative)
     {
-        var rel = (relative ?? "").Replace('\\', '/').Trim().TrimStart('/');
+        var isWindows = OperatingSystem.IsWindows();
+        var raw = relative ?? "";
+        /* Windows clients may send '\' separators; on Linux/macOS it is a legal
+         * file-name character and must be kept. ':' is a Windows-only restriction. */
+        var rel = isWindows ? raw.Replace('\\', '/').Trim() : raw;
+        rel = rel.TrimStart('/');
         if (rel.Length == 0) throw new ArgumentException("A file name is required.");
-        if (rel.Contains(':') || rel.Contains('\0'))
+        if (rel.Contains('\0') || (isWindows && rel.Contains(':')))
             throw new UnauthorizedAccessException("Invalid file name.");
         var parts = rel.Split('/', StringSplitOptions.RemoveEmptyEntries);
         if (parts.Length == 0 || parts.Any(p => p is "." or ".."))

@@ -24,6 +24,47 @@ public sealed class PreviewTests : E2ETestBase
     }
 
     [Fact]
+    public async Task Markdown_preview_renders_formatting_and_switches_to_source()
+    {
+        await Fm.GotoAsync();
+
+        await Fm.Row("notes.md").DblClickAsync();
+        var doc = Page.Locator(".fm-md");
+        await Expect(doc).ToBeVisibleAsync();
+        await Expect(doc.Locator("h1")).ToHaveTextAsync("Notes");
+        await Expect(doc.Locator("li")).ToHaveCountAsync(2);
+
+        await Page.Locator(".fm-md-tab[data-md='source']").ClickAsync();
+        await Expect(Page.Locator(".fm-preview-body pre")).ToContainTextAsync("# Notes");
+        await Expect(Page.Locator(".fm-md")).ToHaveCountAsync(0);
+
+        await Page.Locator(".fm-md-tab[data-md='preview']").ClickAsync();
+        await Expect(doc.Locator("h1")).ToBeVisibleAsync();
+    }
+
+    [Fact]
+    public async Task Markdown_preview_does_not_execute_raw_html()
+    {
+        var path = Path.Combine(Fm.Root1, "xss-check.md");
+        await File.WriteAllTextAsync(path, "# Safe\n\n<script>window.__fmXss = 1;</script>\n");
+        try
+        {
+            await Fm.GotoAsync();
+
+            await Fm.Row("xss-check.md").DblClickAsync();
+            var doc = Page.Locator(".fm-md");
+            await Expect(doc.Locator("h1")).ToHaveTextAsync("Safe");
+            await Expect(doc.Locator("script")).ToHaveCountAsync(0);
+            await Expect(doc).ToContainTextAsync("<script>");
+            Assert.False(await Page.EvaluateAsync<bool>("() => window.__fmXss === 1"));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
     public async Task Image_viewer_zooms_and_rotates_then_closes_with_escape()
     {
         await Fm.GotoAsync();

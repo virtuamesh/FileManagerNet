@@ -2,6 +2,7 @@
 @using FileManagerNet.Models
 @addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 @addTagHelper *, FileManagerNet
+@inject IWebHostEnvironment Env
 @{
     // Office online preview: documents are converted to PDF by LibreOffice.
     // Leave LibreOfficePath empty to auto-detect the usual install location.
@@ -12,6 +13,8 @@
         OfficeConvertTimeoutSeconds = 60,
         OfficeCacheMinutes = 1440
     };
+    // 示例数据放在内容根下，Windows / Linux / macOS 用同一个路径
+    var demoRoot = System.IO.Path.Combine(Env.ContentRootPath, "App_Data", "demo-files");
 }
 <!DOCTYPE html>
 <html lang="en">
@@ -40,8 +43,8 @@
     <div class="page-main">
         <div class="fm-host">
             <file-manager id="FM1"
-                          root-folder='E:\'
-                          root-name="本地磁盘 (E:)"
+                          root-folder="@demoRoot"
+                          root-name="Demo Files"
                           config="fmConfig"
                           api-endpoint="/filemanager-api" />
         </div>

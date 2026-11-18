@@ -605,6 +605,66 @@
   white-space: pre-wrap; word-break: break-word; /* wrap long lines, no horizontal scroll */
 }
 
+/* markdown preview: rendered document on a light page */
+.fm-dialog .fm-md-head {
+  display: inline-flex; align-items: center; gap: 8px;
+  margin-left: auto; flex: 0 0 auto;
+}
+.fm-dialog .fm-md-head .fm-enc-wrap { margin-left: 0; }
+.fm-md-tabs { display: inline-flex; gap: 2px; }
+.fm-md-tab {
+  font: inherit; font-size: 12px; padding: 3px 8px; cursor: pointer;
+  border: 1px solid transparent; border-radius: 4px;
+  background: transparent; color: var(--fm-text-soft);
+}
+.fm-md-tab:hover { background: #e8eef5; color: var(--fm-text); }
+.fm-md-tab.is-active {
+  background: #e8eef5; border-color: #c9d4e0; color: var(--fm-text);
+}
+.fm-preview-body.fm-md-body {
+  display: block; background: #fff; color: #1f2937;
+  padding: 20px 26px; box-sizing: border-box;
+}
+.fm-dialog:has(.fm-md-body) { max-width: 900px; }
+.fm-md { text-align: left; font-size: 14px; line-height: 1.65; }
+.fm-md > :first-child { margin-top: 0; }
+.fm-md h1, .fm-md h2, .fm-md h3,
+.fm-md h4, .fm-md h5, .fm-md h6 {
+  margin: 18px 0 8px; line-height: 1.3; color: #111827; font-weight: 600;
+}
+.fm-md h1 { font-size: 22px; padding-bottom: 6px; border-bottom: 1px solid #e5e7eb; }
+.fm-md h2 { font-size: 18px; padding-bottom: 4px; border-bottom: 1px solid #eef0f3; }
+.fm-md h3 { font-size: 16px; }
+.fm-md h4, .fm-md h5, .fm-md h6 { font-size: 14px; }
+.fm-md p { margin: 10px 0; }
+.fm-md ul, .fm-md ol { margin: 8px 0; padding-left: 24px; }
+.fm-md li { margin: 3px 0; }
+.fm-md li.fm-md-task { list-style: none; margin-left: -20px; }
+.fm-md code {
+  font: 12px Consolas, monospace; background: #f3f4f6;
+  border: 1px solid #e5e7eb; border-radius: 3px; padding: 1px 4px;
+}
+.fm-md pre {
+  margin: 10px 0; padding: 12px; overflow: auto;
+  background: #f6f8fa; border: 1px solid #e5e7eb; border-radius: 4px;
+}
+.fm-md pre code {
+  padding: 0; border: 0; background: none;
+  color: #1f2937; font-size: 12px; line-height: 1.5; white-space: pre;
+}
+.fm-md blockquote {
+  margin: 10px 0; padding: 2px 14px;
+  border-left: 3px solid #d1d5db; color: #6b7280;
+}
+.fm-md table { border-collapse: collapse; margin: 10px 0; width: 100%; }
+.fm-md th, .fm-md td { border: 1px solid #e5e7eb; padding: 6px 10px; }
+.fm-md th { background: #f9fafb; font-weight: 600; }
+.fm-md img { max-width: 100%; height: auto; }
+.fm-md a { color: #1565c0; text-decoration: none; }
+.fm-md a:hover { text-decoration: underline; }
+.fm-md hr { border: 0; border-top: 1px solid #e5e7eb; margin: 16px 0; }
+.fm-md-note { margin-top: 16px; color: #9ca3af; font-size: 12px; text-align: center; }
+
 /* ---------------- toasts ---------------- */
 /* ---------------- OS file-type icons ---------------- */
 /* the SVG stays in place and the system icon is layered on top, so a failed

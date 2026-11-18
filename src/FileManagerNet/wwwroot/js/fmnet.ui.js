@@ -984,6 +984,216 @@
       '</div></div>';
   };
 
+  /* ------------------------------------------------------- markdown preview */
+  var MD_EXTS = ["md", "markdown"];
+
+  function mdHeld(list, html) {
+    list.push(html);
+    return "\u0000" + (list.length - 1) + "\u0000";
+  }
+
+  function mdSplitRow(line) {
+    var s = line.trim();
+    if (s.charAt(0) === "|") s = s.slice(1);
+    if (s.charAt(s.length - 1) === "|") s = s.slice(0, -1);
+    return s.split("|");
+  }
+
+  /* Renders inline markup. Everything is escaped first; only the tags we build
+   * here end up in the DOM, so raw HTML inside a .md file stays visible text. */
+  function mdInline(src, resolve) {
+    var held = [];
+    src = String(src == null ? "" : src);
+    src = src.replace(/`([^`]+)`/g, function (_, code) {
+      return mdHeld(held, "<code>" + esc(code) + "</code>");
+    });
+    src = src.replace(/!\[([^\]]*)\]\(([^)\s]+)(?:\s+["']([^"']*)["'])?\)/g,
+      function (_, alt, url, title) {
+        var safe = resolve(url);
+        if (!safe || /^\s*(javascript|data|vbscript):/i.test(safe)) return esc(alt);
+        return mdHeld(held, '<img src="' + esc(safe) + '" alt="' + esc(alt) + '"' +
+          (title ? ' title="' + esc(title) + '"' : "") + ' loading="lazy" />');
+      });
+    src = src.replace(/\[([^\]]+)\]\(([^)\s]+)(?:\s+["']([^"']*)["'])?\)/g,
+      function (_, label, url, title) {
+        var safe = resolve(url);
+        if (!safe || /^\s*(javascript|data|vbscript):/i.test(safe)) return esc(label);
+        return mdHeld(held, '<a href="' + esc(safe) + '"' +
+          (title ? ' title="' + esc(title) + '"' : "") +
+          ' target="_blank" rel="noopener noreferrer">' + esc(label) + "</a>");
+      });
+    src = src.replace(/<((?:https?:\/\/|mailto:)[^>\s]+)>/g, function (_, url) {
+      return mdHeld(held, '<a href="' + esc(url) + '" target="_blank" rel="noopener noreferrer">' +
+        esc(url) + "</a>");
+    });
+    src = esc(src);
+    src = src.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+      .replace(/__([^_]+)__/g, "<strong>$1</strong>")
+      .replace(/~~([^~]+)~~/g, "<del>$1</del>")
+      .replace(/(^|[\s(])\*([^*\s][^*]*?)\*(?=$|[\s).,;:!?])/g, "$1<em>$2</em>")
+      .replace(/(^|[\s(])_([^_\s][^_]*?)_(?=$|[\s).,;:!?])/g, "$1<em>$2</em>");
+    return src.replace(/\u0000(\d+)\u0000/g, function (_, n) { return held[+n] || ""; });
+  }
+
+  function mdList(lines, resolve) {
+    var html = "", stack = [];
+    lines.forEach(function (raw) {
+      var m = raw.match(/^(\s*)([-*+]|\d+\.)\s+(.*)$/);
+      if (!m) return;
+      var indent = m[1].replace(/\t/g, "    ").length;
+      var tag = /\d/.test(m[2]) ? "ol" : "ul";
+      var text = m[3];
+      while (stack.length && indent < stack[stack.length - 1].indent)
+        html += "</li></" + stack.pop().tag + ">";
+      if (!stack.length || indent > stack[stack.length - 1].indent) {
+        html += "<" + tag + ">";
+        stack.push({ indent: indent, tag: tag });
+      } else if (stack[stack.length - 1].tag !== tag) {
+        html += "</li></" + stack.pop().tag + "><" + tag + ">";
+        stack.push({ indent: indent, tag: tag });
+      } else {
+        html += "</li>";
+      }
+      var task = text.match(/^\[([ xX])\]\s+(.*)$/);
+      if (task) {
+        html += '<li class="fm-md-task"><input type="checkbox" disabled' +
+          (task[1].toLowerCase() === "x" ? " checked" : "") + " /> " + mdInline(task[2], resolve);
+      } else {
+        html += "<li>" + mdInline(text, resolve);
+      }
+    });
+    while (stack.length) html += "</li></" + stack.pop().tag + ">";
+    return html;
+  }
+
+  function mdBlocks(src, resolve) {
+    var lines = String(src == null ? "" : src).replace(/\r\n?/g, "\n").split("\n");
+    var out = [], i = 0;
+
+    function blockStart(line) {
+      if (/^\s{0,3}(#{1,6}\s|```|~~~|>)/.test(line)) return true;
+      if (/^\s*([-*+]|\d+\.)\s+/.test(line)) return true;
+      if (/^\s{0,3}([-*_])(?:\s*\1){2,}\s*$/.test(line)) return true;
+      return line.indexOf("|") >= 0 && i + 1 < lines.length &&
+        /^\s*\|?\s*:?-{2,}/.test(lines[i + 1]);
+    }
+
+    while (i < lines.length) {
+      var line = lines[i];
+      if (!line.trim()) { i++; continue; }
+
+      var fence = line.match(/^\s*(```|~~~)\s*([\w+#.-]*)\s*$/);
+      if (fence) {
+        var code = [], close = new RegExp("^\\s*" + fence[1] + "\\s*$");
+        i++;
+        while (i < lines.length && !close.test(lines[i])) { code.push(lines[i]); i++; }
+        if (i < lines.length) i++;
+        out.push("<pre><code" + (fence[2] ? ' class="language-' + esc(fence[2]) + '"' : "") + ">" +
+          esc(code.join("\n")) + "</code></pre>");
+        continue;
+      }
+
+      var h = line.match(/^\s{0,3}(#{1,6})\s+(.*?)\s*#*\s*$/);
+      if (h) {
+        var lv = h[1].length;
+        out.push("<h" + lv + ">" + mdInline(h[2], resolve) + "</h" + lv + ">");
+        i++; continue;
+      }
+
+      if (/^\s{0,3}([-*_])(?:\s*\1){2,}\s*$/.test(line)) { out.push("<hr />"); i++; continue; }
+
+      if (/^\s{0,3}>/.test(line)) {
+        var quote = [];
+        while (i < lines.length && /^\s{0,3}>/.test(lines[i])) {
+          quote.push(lines[i].replace(/^\s{0,3}>\s?/, ""));
+          i++;
+        }
+        out.push("<blockquote>" + mdBlocks(quote.join("\n"), resolve) + "</blockquote>");
+        continue;
+      }
+
+      if (line.indexOf("|") >= 0 && i + 1 < lines.length &&
+          /^\s*\|?\s*:?-{2,}/.test(lines[i + 1])) {
+        var header = mdSplitRow(line);
+        var aligns = mdSplitRow(lines[i + 1]).map(function (c) {
+          var s = c.trim();
+          if (/^:-+:$/.test(s)) return "center";
+          if (/^-+:$/.test(s)) return "right";
+          if (/^:-+$/.test(s)) return "left";
+          return "";
+        });
+        i += 2;
+        var rows = [];
+        while (i < lines.length && lines[i].trim() && lines[i].indexOf("|") >= 0) {
+          rows.push(mdSplitRow(lines[i])); i++;
+        }
+        var th = header.map(function (c, n) {
+          return "<th" + (aligns[n] ? ' style="text-align:' + aligns[n] + '"' : "") + ">" +
+            mdInline(c.trim(), resolve) + "</th>";
+        }).join("");
+        var tb = rows.map(function (r) {
+          return "<tr>" + header.map(function (_, n) {
+            return "<td" + (aligns[n] ? ' style="text-align:' + aligns[n] + '"' : "") + ">" +
+              mdInline((r[n] || "").trim(), resolve) + "</td>";
+          }).join("") + "</tr>";
+        }).join("");
+        out.push("<table><thead><tr>" + th + "</tr></thead><tbody>" + tb + "</tbody></table>");
+        continue;
+      }
+
+      if (/^\s*([-*+]|\d+\.)\s+/.test(line)) {
+        var items = [];
+        while (i < lines.length && (/^\s*([-*+]|\d+\.)\s+/.test(lines[i]) || !lines[i].trim())) {
+          if (lines[i].trim()) items.push(lines[i]);
+          i++;
+        }
+        out.push(mdList(items, resolve));
+        continue;
+      }
+
+      var para = [];
+      while (i < lines.length && lines[i].trim() && !blockStart(lines[i])) {
+        para.push(lines[i]); i++;
+      }
+      out.push("<p>" + para.join("\n").split(/ {2,}\n/).map(function (p) {
+        return mdInline(p.replace(/\n/g, " "), resolve);
+      }).join("<br />") + "</p>");
+    }
+    return out.join("\n");
+  }
+
+  /* Resolves a Markdown URL against the folder of the document. Root-relative
+   * and external URLs are kept; relative ones become download links; anything
+   * with an unknown scheme (javascript:, data:) is dropped. */
+  function mdResolveUrl(baseDir, raw, downloadUrl) {
+    var url = String(raw || "").trim();
+    if (!url) return "";
+    if (/^(https?:\/\/|mailto:)/i.test(url)) return url;
+    if (url.charAt(0) === "#" || url.charAt(0) === "/") return url;
+    if (/^[a-z][a-z0-9+.-]*:/i.test(url)) return "";
+    var segs = (baseDir + "/" + url).split("/"), norm = [];
+    segs.forEach(function (s) {
+      if (!s || s === ".") return;
+      if (s === "..") { norm.pop(); return; }
+      norm.push(s);
+    });
+    return downloadUrl + "&inline=1&path=" + encodeURIComponent("/" + norm.join("/"));
+  }
+
+  function renderMarkdown(text, resolve) {
+    try {
+      return mdBlocks(text, resolve);
+    } catch (err) {
+      return "<pre>" + esc(text) + "</pre>";
+    }
+  }
+
+  /* exposed for unit tests — both functions are pure and never touch the DOM */
+  core.markdown = {
+    render: renderMarkdown,
+    resolveUrl: mdResolveUrl
+  };
+
   P._preview = function (e) {
     if (this.config.allowDownload === false) { this.toast(this.t("previewDisabled"), "info"); return; }
     if (this._previewBlocked(e)) {
@@ -1072,36 +1282,70 @@
     }
 
     if (TEXT_EXTS.indexOf(ext) >= 0) {
+      var isMd = MD_EXTS.indexOf(ext) >= 0;
+      var mdMode = "preview";
+      var headExtra = this._encodingSelectHtml(ext);
+      if (isMd) {
+        headExtra = '<span class="fm-md-head"><span class="fm-md-tabs">' +
+          '<button type="button" class="fm-md-tab is-active" data-md="preview">' +
+          esc(this.t("mdPreview")) + '</button>' +
+          '<button type="button" class="fm-md-tab" data-md="source">' +
+          esc(this.t("mdSource")) + '</button></span>' + headExtra + '</span>';
+      }
       var ov0 = this._openPreviewShell(e.name,
-        '<div class="fm-preview-body"><pre>' + esc(this.t("loading")) + '</pre></div>',
-        this._encodingSelectHtml(ext));
+        '<div class="fm-preview-body' + (isMd ? ' fm-md-body' : '') + '"><pre>' +
+        esc(this.t("loading")) + '</pre></div>',
+        headExtra);
+      /* links and images inside the document resolve relative to its folder */
+      var mdBase = e.path.slice(0, e.path.lastIndexOf("/"));
+      var mdDownload = self.api + "/download?instance=" + encodeURIComponent(self.id);
+      function mdResolve(raw) {
+        return mdResolveUrl(mdBase, raw, mdDownload);
+      }
       /* logs can be gigabytes — read the head of the file only */
       var truncated = (e.size || 0) > TEXT_PREVIEW_LIMIT;
       var opts = truncated ? { headers: { Range: "bytes=0-" + (TEXT_PREVIEW_LIMIT - 1) } } : undefined;
       this._fetchPayload(fileUrl, opts)
         .then(function (r) { return r.arrayBuffer(); })
         .then(function (buf) {
-          var pre = ov0.querySelector("pre");
+          var body = ov0.querySelector(".fm-preview-body");
           var sel = ov0.querySelector(".fm-enc-select");
           var det = ov0.querySelector(".fm-enc-detected");
-          if (!pre) return;                     /* dialog already closed */
+          if (!body) return;                     /* dialog already closed */
           function render(choice) {
             var r = decodeBytes(buf, choice);
-            pre.textContent = r.text == null ? "" : r.text;
+            var text = r.text == null ? "" : r.text;
             if (det) det.textContent = (choice === "auto" && r.enc) ? r.enc.toUpperCase() : "";
+            body.classList.toggle("fm-md-body", isMd && mdMode === "preview");
+            if (isMd && mdMode === "preview") {
+              body.innerHTML = '<div class="fm-md">' + renderMarkdown(text, mdResolve) + '</div>' +
+                (truncated ? '<div class="fm-md-note">— ' +
+                  esc(self.t("previewTruncated", "4 MB")) + ' —</div>' : "");
+              return;
+            }
+            body.innerHTML = "<pre></pre>";
+            body.querySelector("pre").textContent = text +
+              (truncated ? "\n\n— " + self.t("previewTruncated", "4 MB") + " —" : "");
           }
           var saved = "auto";
           try { saved = localStorage.getItem("fmnet-enc-" + ext) || "auto"; } catch (err) {}
           if (sel) sel.value = saved;
           render(saved);
-          if (truncated)
-            pre.textContent += "\n\n— " + self.t("previewTruncated", "4 MB") + " —";
           if (sel) sel.addEventListener("change", function () {
             try { localStorage.setItem("fmnet-enc-" + ext, sel.value); } catch (err) {}
             render(sel.value);
-            if (truncated)
-              pre.textContent += "\n\n— " + self.t("previewTruncated", "4 MB") + " —";
           });
+          if (isMd) {
+            ov0.querySelectorAll(".fm-md-tab").forEach(function (btn) {
+              btn.addEventListener("click", function () {
+                mdMode = btn.getAttribute("data-md");
+                ov0.querySelectorAll(".fm-md-tab").forEach(function (b) {
+                  b.classList.toggle("is-active", b === btn);
+                });
+                render(sel ? sel.value : "auto");
+              });
+            });
+          }
         })
         .catch(function (err) { self._previewFail(ov0, err, fileUrl); });
       return;

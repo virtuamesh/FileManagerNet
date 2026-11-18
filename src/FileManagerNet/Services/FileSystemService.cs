@@ -15,8 +15,12 @@ namespace FileManagerNet.Services;
 /// </summary>
 public sealed class FileSystemService : IFileSystemService
 {
+    /// <summary>Windows paths are case-insensitive and treat '\' as a separator;
+    /// Linux/macOS paths are case-sensitive and may contain ':' and '..' in names.</summary>
+    private static readonly bool IsWindows = OperatingSystem.IsWindows();
+
     private static readonly StringComparison PathComparison =
-        OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        IsWindows ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
 
     private readonly string _root;                 // first mount; in single-root mode: the root itself
     private readonly IReadOnlyList<FileSystemMount> _mounts; // one or more browsable folders
@@ -96,7 +100,8 @@ public sealed class FileSystemService : IFileSystemService
     {
         var sb = new System.Text.StringBuilder(raw.Length);
         foreach (var ch in raw.Trim())
-            sb.Append(ch is '/' or '\\' or ':' or '\0' || char.IsControl(ch) ? '_' : ch);
+            sb.Append(ch is '/' or '\0' || char.IsControl(ch) || (IsWindows && ch is '\\' or ':')
+                ? '_' : ch);
         var name = sb.ToString().Trim();
         if (name is "." or "..") name = "_" + name;
         if (name.Length == 0) name = "Root";
@@ -114,11 +119,18 @@ public sealed class FileSystemService : IFileSystemService
     {
         if (string.IsNullOrEmpty(virtualPath)) return "/";
 
-        // Normalize separators, strip query junk
-        var p = virtualPath.Replace('\\', '/').Trim();
+        /* On Windows '\' is also a separator; on Linux/macOS it is a legal file-name
+         * character, so only Windows input is converted. Trailing/leading spaces are
+         * legal in Unix names too, so trimming is Windows-only. */
+        var p = IsWindows ? virtualPath.Replace('\\', '/').Trim() : virtualPath;
         if (p.Length > 1 && p.EndsWith('/')) p = p.TrimEnd('/');
 
-        if (p.Contains("..") || p.Contains(':') || p.Contains('\0') || p.Contains("//"))
+        /* '.' and '..' are only dangerous as complete segments — "report..final" is a
+         * perfectly valid name on every platform. ':' is a drive/stream separator on
+         * Windows only. */
+        var segments = p.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        if (p.Contains('\0') || p.Contains("//") || segments.Any(s => s is "." or "..") ||
+            (IsWindows && p.Contains(':')))
             throw new UnauthorizedAccessException("Invalid path.");
         return p.StartsWith('/') ? p : "/" + p;
     }
@@ -187,15 +199,17 @@ public sealed class FileSystemService : IFileSystemService
             ? ""
             : physical[mount.PhysicalPath.Length..].TrimStart(Path.DirectorySeparatorChar);
         if (rel.Length == 0) return prefix.Length == 0 ? "/" : prefix;
-        return prefix + "/" + rel.Replace('\\', '/');
+        return prefix + "/" + (IsWindows ? rel.Replace('\\', '/') : rel);
     }
 
     /// <summary>Combines a virtual folder with a validated child name.</summary>
     private static string Combine(string folderVirtual, string name)
     {
-        name = name.Trim();
-        if (name is "" or "." or ".." || name.Contains('/') || name.Contains('\\') ||
-            name.Contains(':') || name.Contains('\0') || name.Contains(".."))
+        /* Windows trims trailing dots/spaces and forbids ':' and '\' in names;
+         * Linux/macOS allow them, so only the separator and NUL are invalid there. */
+        name = IsWindows ? name.Trim() : name;
+        if (name is "" or "." or ".." || name.Contains('/') || name.Contains('\0') ||
+            (IsWindows && (name.Contains('\\') || name.Contains(':'))))
             throw new UnauthorizedAccessException("Invalid name.");
         return folderVirtual == "/" ? "/" + name : folderVirtual + "/" + name;
     }

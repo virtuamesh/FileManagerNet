@@ -25,7 +25,12 @@ app.MapFileManagerNet("/filemanager-api", o =>
 
 // FileManagerNet —— 权限示例（ACL）：一个根目录下，不同子目录不同权限。
 // 页面 /Acl 用同一个 id 渲染，模板注册时不会把这里的规则冲掉。
-var aclRoot = new FileManagerRoot(@"D:\测试文档\_acl-demo", "ACL 演示");
+// 用内容根下的可写目录，Windows / Linux / macOS 都能直接跑。
+var aclDemoRoot = Path.Combine(app.Environment.ContentRootPath, "App_Data", "acl-demo");
+foreach (var sub in new[] { "public/images", "docs", "secret" })
+    Directory.CreateDirectory(Path.Combine(aclDemoRoot, sub));
+
+var aclRoot = new FileManagerRoot(aclDemoRoot, "ACL 演示");
 aclRoot
     // 整棵树默认只读：可以浏览、下载、预览，不能改动
     .Allow("/", FileManagerPermissions.ReadOnly)

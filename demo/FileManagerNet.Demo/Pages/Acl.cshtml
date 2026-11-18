@@ -2,12 +2,15 @@
 @using FileManagerNet.Models
 @addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 @addTagHelper *, FileManagerNet
+@inject IWebHostEnvironment Env
 @{
     var fmConfig = new FileManagerConfig
     {
         DefaultView = ViewLayout.Details,
         MaxUploadBytes = 0,
     };
+    // 与 Program.cs 中的 ACL 根一致，跨平台可用
+    var aclRoot = System.IO.Path.Combine(Env.ContentRootPath, "App_Data", "acl-demo");
 }
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -40,7 +43,7 @@
     <div class="page-main">
         <div class="fm-host">
             <file-manager id="FM_ACL"
-                          root-folder='D:\测试文档\_acl-demo'
+                          root-folder="@aclRoot"
                           root-name="ACL 演示"
                           config="fmConfig"
                           api-endpoint="/filemanager-api" />

@@ -77,8 +77,10 @@ public sealed class FileManagerRoot
         foreach (var raw in spec!.Split(new[] { ';', '\n', '\r' },
                      StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
         {
+            /* A rooted path may itself contain '=' (e.g. "/srv/a=b" on Linux/macOS),
+             * so only a non-rooted entry can use the "name=path" form. */
             var eq = raw.IndexOf('=');
-            if (eq > 0)
+            if (eq > 0 && !System.IO.Path.IsPathRooted(raw))
             {
                 var name = raw[..eq].Trim();
                 var path = raw[(eq + 1)..].Trim();

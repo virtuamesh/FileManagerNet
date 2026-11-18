@@ -2,10 +2,12 @@
 @using FileManagerNet.Models
 @addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 @addTagHelper *, FileManagerNet
+@inject IWebHostEnvironment Env
 @{
     var leftCfg = new FileManagerConfig { DefaultView = ViewLayout.Details };
     var rightCfg = new FileManagerConfig { DefaultView = ViewLayout.LargeIcons };
-    var leftRoot = System.IO.Directory.Exists(@"D:\测试文档") ? @"D:\测试文档" : AppContext.BaseDirectory;
+    var demoRoot = System.IO.Path.Combine(Env.ContentRootPath, "App_Data", "demo-files");
+    var leftRoot = System.IO.Directory.Exists(@"D:\测试文档") ? @"D:\测试文档" : demoRoot;
     var rightRoot = System.IO.Directory.Exists(@"D:\测试文档\文档") ? @"D:\测试文档\文档" : leftRoot;
 }
 <!DOCTYPE html>
